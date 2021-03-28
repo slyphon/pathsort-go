@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"syscall"
 
 	app "github.com/slyphon/pathsort-go/internal/pkg/app"
 )
@@ -26,11 +27,16 @@ func init() {
 
 func isDir(path string) bool {
 	st, err := os.Stat(path)
-	if err != nil {
+
+	if err == nil {
+		return st.IsDir()
+	}
+	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOENT {
+		return false
+	} else {
 		log.Printf("Error: could not stat path %v", path)
 		return false
 	}
-	return st.IsDir()
 }
 
 func App() {
