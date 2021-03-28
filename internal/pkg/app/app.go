@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -75,4 +76,99 @@ func LoadConfigFile(path string, homeStr string) (config *Config, err error) {
 	}
 
 	return loadConfigFromTree(tree, homeStr)
+}
+
+/// assertConsistent iterates over the Order list of tags and will panic
+/// if they are not all defined in the Tags slice
+func (c *Config) assertConsistent() {
+	panic("not implemented")
+}
+
+func (c *Config) makeIndexMap() (imap map[string]int) {
+	imap = make(map[string]int, len(c.Order))
+	for i, tag := range c.Order {
+		imap[tag] = i
+	}
+	return imap
+}
+
+func (c *Config) makeBuckets() (buckets [][]string) {
+	buckets = make([][]string, len(c.Order))
+	for i := range c.Order {
+		buckets[i] = make([]string, 0, 5)
+	}
+	return buckets
+}
+
+/// isDuplicate returns true if needle is found in haystack
+func isDuplicate(needle string, haystack []string) bool {
+	for _, h := range haystack {
+		if needle == h {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) Fix(pathstr string) (newPath string) {
+	imap := c.makeIndexMap()
+	buckets := c.makeBuckets()
+	var other []string
+
+	pathEls := strings.Split(pathstr, ":")
+
+	var foundMatch bool
+
+	for _, el := range pathEls {
+		foundMatch = false
+		for i, re := range c.Patterns {
+			if re.MatchString(el) {
+				foundMatch = true
+				// using the index of Patterns, we know the Tag, so we use the
+				// indexMap to look up what ordered bucket it goes in, and add
+				// this path element to the correct bucket.
+				// index -> tag name -> order index
+				//
+				tag := c.Tags[i]
+
+				// if the tag is the special NULL tag, we drop this path element
+				if tag == "NULL" {
+					break
+				}
+
+				bi := imap[tag]
+				if !isDuplicate(el, buckets[bi]) {
+					buckets[bi] = append(buckets[bi], el)
+					break
+				}
+			}
+		}
+		// if we didn't match any patterns, put the path element into the
+		// "other" slice for use later
+		if !foundMatch {
+			other = append(other, el)
+		}
+	}
+
+	result := make([]string, 0, len(pathEls))
+
+	fmt.Printf("%+v\n", buckets)
+
+	for _, bucket := range buckets {
+		for _, el := range bucket {
+			result = append(result, el)
+		}
+	}
+
+	fmt.Printf("result (before append other)): %+v\n", result)
+	fmt.Printf("len(other): %d\n", len(other))
+
+	if other != nil {
+		result = append(result, other...)
+	}
+
+	fmt.Printf("result: %+v\n", result)
+	fmt.Printf("other: %+v\n", other)
+
+	return strings.Join(result, ":")
 }
