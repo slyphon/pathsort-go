@@ -55,6 +55,10 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string) (config *Config, err er
 		Order:    tree.GetArray("tag_order").([]string),
 	}
 
+	if err = config.validateNames(); err != nil {
+		return nil, err
+	}
+
 	return
 }
 
@@ -68,20 +72,29 @@ func LoadConfigString(tomlStr string, homeStr string) (config *Config, err error
 	return loadConfigFromTree(tree, homeStr)
 }
 
-func LoadConfigFile(path string, homeStr string) (config *Config, err error) {
+func LoadConfigFile(configPath string, homeStr string) (config *Config, err error) {
 	var tree *toml.Tree
 
-	if tree, err = toml.LoadFile(path); err != nil {
+	if tree, err = toml.LoadFile(configPath); err != nil {
 		return nil, err
 	}
 
 	return loadConfigFromTree(tree, homeStr)
 }
 
-/// assertConsistent iterates over the Order list of tags and will panic
+/// validateNames iterates over the Order list of tags and will panic
 /// if they are not all defined in the Tags slice
-func (c *Config) assertConsistent() {
-	panic("not implemented")
+func (c *Config) validateNames() (err error) {
+	tmap := make(map[string]bool, len(c.Tags))
+	for _, t := range c.Tags {
+		tmap[t] = true
+	}
+	for _, o := range c.Order {
+		if _, ok := tmap[o]; !ok {
+			return fmt.Errorf("Order name %v not declared in tag patterns. Please check your config", o)
+		}
+	}
+	return nil
 }
 
 func (c *Config) makeIndexMap() (imap map[string]int) {
@@ -110,7 +123,7 @@ func isDuplicate(needle string, haystack []string) bool {
 	return false
 }
 
-func (c *Config) Fix(pathstr string) (newPath string) {
+func (c *Config) Fix(pathstr string) (newPathEls []string) {
 	imap := c.makeIndexMap()
 	buckets := c.makeBuckets()
 	var other []string
@@ -152,23 +165,15 @@ func (c *Config) Fix(pathstr string) (newPath string) {
 
 	result := make([]string, 0, len(pathEls))
 
-	fmt.Printf("%+v\n", buckets)
-
 	for _, bucket := range buckets {
 		for _, el := range bucket {
 			result = append(result, el)
 		}
 	}
 
-	fmt.Printf("result (before append other)): %+v\n", result)
-	fmt.Printf("len(other): %d\n", len(other))
-
 	if other != nil {
 		result = append(result, other...)
 	}
 
-	fmt.Printf("result: %+v\n", result)
-	fmt.Printf("other: %+v\n", other)
-
-	return strings.Join(result, ":")
+	return result
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 
 	app "github.com/slyphon/pathsort-go/internal/pkg/app"
 )
@@ -23,6 +24,15 @@ func init() {
 	envConfigPath = os.Getenv("PATHSORT_CONFIG")
 }
 
+func isDir(path string) bool {
+	st, err := os.Stat(path)
+	if err != nil {
+		log.Printf("Error: could not stat path %v", path)
+		return false
+	}
+	return st.IsDir()
+}
+
 func App() {
 	if origPath == "" {
 		log.Fatal("PATH was not set!")
@@ -31,14 +41,23 @@ func App() {
 	var config *app.Config
 	var err error
 
-	path := defaultConfigPath
+	configPath := defaultConfigPath
 	if envConfigPath != "" {
-		path = envConfigPath
+		configPath = envConfigPath
 	}
 
-	if config, err = app.LoadConfigFile(path, defaultConfigPath); err != nil {
+	if config, err = app.LoadConfigFile(configPath, home); err != nil {
 		log.Fatalf("error loading config file: %v", err)
 	}
 
-	fmt.Printf("config order: %s\n", config.Order)
+	newPaths := config.Fix(origPath)
+
+	cleanPaths := make([]string, 0, len(newPaths))
+	for _, p := range newPaths {
+		if isDir(p) {
+			cleanPaths = append(cleanPaths, p)
+		}
+	}
+
+	fmt.Printf("export PATH=\"%s\"\n", strings.Join(cleanPaths, ":"))
 }

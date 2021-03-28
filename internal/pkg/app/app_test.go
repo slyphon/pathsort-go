@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const PathFull = "/home/slyphon/.goenv/shims:/home/slyphon/.goenv/bin:/opt/wtfisthis:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/home/slyphon/bin"
+const PathFull = "/home/slyphon/.goenv/shims:/home/slyphon/.goenv/bin:/opt/wtfisthis:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/home/slyphon/bin:/usr/bin:/usr/sbin"
 
 const Config1 = `
 tag_order = ["goenv", "home_bin", "usr_local", "usr_bins", "bins"]
@@ -77,6 +77,16 @@ func (s *PathsortSuite) TestPatternsProperty() {
 }
 
 func (s *PathsortSuite) TestFixOrdering() {
-	expected := "/home/slyphon/.goenv/shims:/home/slyphon/.goenv/bin:/home/slyphon/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin"
+	expected := []string{
+		"/home/slyphon/.goenv/shims",
+		"/home/slyphon/.goenv/bin",
+		"/home/slyphon/bin",
+		"/usr/local/bin",
+		"/usr/local/sbin",
+		"/usr/bin",
+		"/usr/sbin",
+		"/sbin",
+		"/bin",
+	}
 	s.r.Equal(expected, s.config.Fix(PathFull))
 }

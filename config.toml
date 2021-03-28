@@ -8,15 +8,14 @@
 tag_order = [
   "home_local_bin",
   "home_dot_local_bin",
+  "home_bin",
   "goenv",
-  "gopath_bin",
   "rvm",
   "rbenv",
   "pyenv",
   "cargo_bin",
   "home_opt",
   "home_settings_bin",
-  "home_bin",
   "nix",
   "ccache",
   "dottools_git",
@@ -26,30 +25,25 @@ tag_order = [
   "gvm",
   "twitter",
   "hand_compiled",
-  "google_cloud",
   "mac_gpg2",
   "nix",
   "brew",
   "npm",
   "postgres",
-  "jruby",
-  "opt_gnu_bin",
   "debgems",
   "kerberos",
   "linuxbrew",
   "usr_local",
   "usr_bin",
   "slash_bin",
-  "pkgsrc",
   "usr_local_conda",
-  "all",
   "x11",
 ]
 
 [patterns]
 home_opt           = "\\A@HOME@/local/opt"
-home_local_sbin    = "\\A@HOME@/local/sbin"
-home_bin           = "\\A@HOME@/bin(?:/|$)"
+home_local_bin     = "\\A@HOME@/local/s?bin"
+home_bin           = "\\A@HOME@/bin"
 home_settings_bin  = "\\A@HOME@/.settings/bin(?:/|$)"
 home_dot_local_bin = "\\A@HOME@/.local/bin$"
 nix                = "(^/nix/|/.nix-profile/)"
@@ -68,7 +62,7 @@ twpython_27        = "/twpython/CPython-2\\.7"
 twpython_26        = "/twpython/CPython-2\\.6"
 twpython_rest      = "/twpython/"
 twitter_mde        = "\\A/opt/twitter_mde/"
-mac_gpg22          = "\\A/usr/local/MacGPG2/"
+mac_gpg2           = "\\A/usr/local/MacGPG2/"
 hand_compiled      = "\\A/opt/jds"
 munki              = "/munki($|/)"
 brew               = "\\A(?:/usr/local/(bin|sbin|opt/fzf/bin)$)"
