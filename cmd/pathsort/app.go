@@ -34,7 +34,7 @@ func isDir(path string) bool {
 	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOENT {
 		return false
 	} else {
-		log.Printf("Error: could not stat path %v", path)
+		log.Printf("Error: could not stat path %v, err; %+v", path, e)
 		return false
 	}
 }
