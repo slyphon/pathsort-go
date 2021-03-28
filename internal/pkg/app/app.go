@@ -1,30 +1,31 @@
-package pathsort
+package app
 
 import (
-	toml "github.com/pelletier/go-toml"
-	"regexp"
-	"os"
 	"log"
+	"os"
+	"regexp"
 	"strings"
+
+	toml "github.com/pelletier/go-toml"
 )
 
 func mustGetEnv(k string) string {
 	v, ok := os.LookupEnv(k)
 	if !ok {
-			log.Panicf("environment var %s was not set", k)
+		log.Panicf("environment var %s was not set", k)
 	}
 	return v
 }
 
 var (
-	Home = mustGetEnv("HOME")
 	Path = mustGetEnv("PATH")
 )
 
 type (
 	Config struct {
-		Tags []string
+		Tags     []string
 		Patterns []*regexp.Regexp
+		Order    []string
 	}
 )
 
@@ -38,7 +39,7 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string) (config *Config, err er
 	var tags []string
 	var patterns []*regexp.Regexp
 
-	for tag, ptrn := range(tree.Get("patterns").(*toml.Tree).ToMap()) {
+	for tag, ptrn := range tree.Get("patterns").(*toml.Tree).ToMap() {
 		tags = append(tags, tag)
 		var p string // god go is fucking obnoxious
 		p = ptrn.(string)
@@ -48,12 +49,14 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string) (config *Config, err er
 	}
 
 	config = &Config{
-		Tags: tags,
+		Tags:     tags,
 		Patterns: patterns,
+		Order:    tree.GetArray("tag_order").([]string),
 	}
 
 	return
 }
+
 // "/home/slyphon/code/pathsort-go/config.toml"
 
 func LoadConfigString(tomlStr string, homeStr string) (config *Config, err error) {
@@ -73,4 +76,3 @@ func LoadConfigFile(path string, homeStr string) (config *Config, err error) {
 
 	return loadConfigFromTree(tree, homeStr)
 }
-

@@ -1,12 +1,12 @@
-package pathsort
+package app
 
 import (
-	"testing"
 	"flag"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
+	"os"
+	"testing"
+
 	"github.com/ToQoz/gopwt"
-	"github.com/ToQoz/gopwt/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 const PathFull = "/home/slyphon/.goenv/shims:/home/slyphon/.goenv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin"
@@ -19,6 +19,7 @@ usr_local = "\\A/usr/local/bin"
 bins = "\\A/s?bin$"
 goenv = "/\\.goenv(/|$)"
 `
+const Home = "/home/slyphon"
 
 type PathsortSuite struct {
 	suite.Suite
@@ -36,6 +37,11 @@ func TestPathsortSuite(t *testing.T) {
 	suite.Run(t, new(PathsortSuite))
 }
 
-type (ps *PathsortSuite) SetupTest() {
+func (ps *PathsortSuite) TestConfigParsing() {
+	var config *Config
+	var err error
 
+	config, err = LoadConfigString(Config1, Home)
+	ps.NoError(err)
+	ps.NotNil(config)
 }
