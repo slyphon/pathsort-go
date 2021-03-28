@@ -1,11 +1,8 @@
 package app
 
 import (
-	"flag"
-	"os"
 	"testing"
 
-	"github.com/ToQoz/gopwt"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -24,12 +21,6 @@ const Home = "/home/slyphon"
 type PathsortSuite struct {
 	suite.Suite
 	config string
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	gopwt.Empower()
-	os.Exit(m.Run())
 }
 
 // hook up tests
