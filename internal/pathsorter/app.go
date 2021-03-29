@@ -1,13 +1,14 @@
-package app
+package pathsorter
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/shell"
 	toml "github.com/pelletier/go-toml"
+	log "github.com/sirupsen/logrus"
 )
 
 func mustGetEnv(k string) string {
@@ -19,7 +20,8 @@ func mustGetEnv(k string) string {
 }
 
 var (
-	Path = mustGetEnv("PATH")
+	Path     = mustGetEnv("PATH")
+	envVarRe = regexp.MustCompile("([$][A-Za-z_][A-Za-z0-9_]+)\\b")
 )
 
 type (
@@ -36,24 +38,92 @@ func check(e error) {
 	}
 }
 
-func loadConfigFromTree(tree *toml.Tree, homeStr string) (config *Config, err error) {
+// if we couldn't locate a var in the environment, we return the empty string
+func replaceEnvVars(ptrn string, envMap map[string]string) string {
+	var i []int
+	var result []string
+	remain := ptrn
+	for {
+
+		i = envVarRe.FindStringIndex(remain)
+
+		if i == nil {
+			// we're done here, so take on the remaining string
+			// to the result slice
+			result = append(result, remain)
+			break
+		}
+
+		// i was not nil, so we must hve found a result, therefore the
+		// positions to the left of i[0] are non-match, and should be added to
+		// result
+		result = append(result, remain[0:i[0]])
+
+		// look for varname in environment, here we strip the leading '$'
+		varname := remain[i[0]+1 : i[1]]
+
+		if v, ok := envMap[varname]; ok {
+			// we found varname in the environment, that means we
+			// need to append the value (instead of the variable)
+			result = append(result, v)
+			// and the rest of the string becomes "remain"
+			remain = remain[i[1]:]
+		} else {
+			// we didn't find the variable in the given env map
+			// so we return the empty string to indicate that we were
+			// unable to make a substitution and allow the caller to
+			// decide how to handle it
+			return ""
+		}
+	}
+
+	return strings.Join(result, "")
+}
+
+const notFoundVarLogMessage = "pattern %q contained environment variables that could not be expanded, it will be ignored"
+
+func loadConfigFromTree(tree *toml.Tree, homeStr string, env []string) (config *Config, err error) {
 	var tags []string
 	var patterns []*regexp.Regexp
+	var notFoundVarTags map[string]bool
+	envMap := shell.BuildEnvs(env)
 
 	for tag, ptrn := range tree.Get("patterns").(*toml.Tree).ToMap() {
 		tags = append(tags, tag)
 		var p string // god go is fucking obnoxious
 		p = ptrn.(string)
-		p = strings.Replace(p, "@HOME@", homeStr, -1)
-		reg := regexp.MustCompile(p)
+
+		newp := replaceEnvVars(p, envMap)
+		if newp == "" {
+			log.Warningf(notFoundVarLogMessage, p)
+			notFoundVarTags[tag] = true
+			continue
+		}
+		reg := regexp.MustCompile(newp)
 		patterns = append(patterns, reg)
+	}
+
+	// filter out tags with not found environment variables from the ordering list
+	// since we won't ever find those tags in PATH
+	var tagOrder []string
+	for _, tag := range tree.GetArray("tag_order").([]string) {
+		if _, ok := notFoundVarTags[tag]; ok {
+			continue
+		} else {
+			tagOrder = append(tagOrder, tag)
+		}
 	}
 
 	config = &Config{
 		Tags:     tags,
 		Patterns: patterns,
-		Order:    tree.GetArray("tag_order").([]string),
+		Order:    tagOrder,
 	}
+
+	log.Debugf("config loaded:")
+	log.Debugf("tags:     %+v", config.Tags)
+	log.Debugf("patterns: %+v", config.Patterns)
+	log.Debugf("order:    %+v", config.Order)
 
 	if err = config.validateNames(); err != nil {
 		return nil, err
@@ -64,22 +134,22 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string) (config *Config, err er
 
 // "/home/slyphon/code/pathsort-go/config.toml"
 
-func LoadConfigString(tomlStr string, homeStr string) (config *Config, err error) {
+func LoadConfigString(tomlStr string, homeStr string, env []string) (config *Config, err error) {
 	var tree *toml.Tree
 	if tree, err = toml.Load(tomlStr); err != nil {
 		return nil, err
 	}
-	return loadConfigFromTree(tree, homeStr)
+	return loadConfigFromTree(tree, homeStr, env)
 }
 
-func LoadConfigFile(configPath string, homeStr string) (config *Config, err error) {
+func LoadConfigFile(configPath string, homeStr string, env []string) (config *Config, err error) {
 	var tree *toml.Tree
 
 	if tree, err = toml.LoadFile(configPath); err != nil {
 		return nil, err
 	}
 
-	return loadConfigFromTree(tree, homeStr)
+	return loadConfigFromTree(tree, homeStr, env)
 }
 
 /// validateNames iterates over the Order list of tags and will panic

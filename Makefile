@@ -69,7 +69,33 @@ test-coverage: fmt lint test-coverage-tools
 	@$(GOCOV) convert $(COVERAGE_PROFILE) | $(GOCOVXML) > $(COVERAGE_XML)
 
 
+##################################################################################
+# binaries to build
+
+ARM_BIN_NAME       := reorderpath.Linux.arm71
+DARWIN_BIN_NAME    := reorderpath.Darwin.x86_64
+LINUX_X86_BIN_NAME := reorderpath.Linux.x86_64
+
+ARM_BIN_PATH       := $(BIN)/$(ARM_BIN_NAME)
+DARWIN_BIN_PATH    := $(BIN)/$(DARWIN_BIN_NAME)
+LINUX_X86_BIN_PATH := $(BIN)/$(LINUX_X86_BIN_NAME)
+
+$(ARM_BIN_PATH): $(BIN)
+	env GOOS=linux GOARCH=arm GOARM=7 go build -o $(ARM_BIN_PATH)
+
+$(LINUX_X86_BIN_PATH): $(BIN)
+	env GOOS=linux GOARCH=amd64 go build -o $(LINUX_X86_BIN_PATH)
+
+$(DARWIN_BIN_PATH): $(BIN)
+	env GOOS=darwin GOARCH=amd64 go build -o $(DARWIN_BIN_PATH)
+
+BINARIES := $(ARM_BIN_PATH) $(LINUX_X86_BIN_PATH) $(DARWIN_BIN_PATH)
 
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo v0)
-all: fmt lint | $(BIN)
-	go build -o $(BIN)/reorderpath main.go
+
+.PHONY: clean
+clean:
+	rm bin/*
+
+.PHONY: all
+all: fmt lint | $(BIN) $(BINARIES)

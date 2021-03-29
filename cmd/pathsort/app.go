@@ -2,13 +2,13 @@ package pathsort
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
 	"syscall"
 
-	app "github.com/slyphon/pathsort-go/internal/pkg/app"
+	log "github.com/sirupsen/logrus"
+	app "github.com/slyphon/pathsort-go/internal/pathsorter"
 )
 
 var (
@@ -23,6 +23,12 @@ func init() {
 	home = os.Getenv("HOME")
 	defaultConfigPath = path.Join(home, ".pathsort.toml")
 	envConfigPath = os.Getenv("PATHSORT_CONFIG")
+
+	if os.Getenv("PATHSORT_DEBUG") != "" {
+		log.SetLevel(log.TraceLevel)
+	} else {
+		log.SetLevel(log.ErrorLevel)
+	}
 }
 
 func isDir(path string) bool {
@@ -52,7 +58,7 @@ func App() {
 		configPath = envConfigPath
 	}
 
-	if config, err = app.LoadConfigFile(configPath, home); err != nil {
+	if config, err = app.LoadConfigFile(configPath, home, os.Environ()); err != nil {
 		log.Fatalf("error loading config file: %v", err)
 	}
 
