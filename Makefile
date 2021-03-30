@@ -95,7 +95,7 @@ VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null 
 
 .PHONY: clean
 clean:
-	rm bin/*
+	rm -f $(BINARIES)
 
 .PHONY: all
 all: fmt lint | $(BIN) $(BINARIES)

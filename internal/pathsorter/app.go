@@ -235,9 +235,18 @@ func (c *Config) Fix(pathstr string) (newPathEls []string) {
 
 	result := make([]string, 0, len(pathEls))
 
+	// a "set" more or less for stripping duplicates in the scope of the whole path
+	dedup := make(map[string]bool)
+
 	for _, bucket := range buckets {
 		for _, el := range bucket {
-			result = append(result, el)
+			if _, has := dedup[el]; has {
+				// this is a dup, skip it
+				continue
+			} else {
+				dedup[el] = true
+				result = append(result, el)
+			}
 		}
 	}
 

@@ -71,5 +71,5 @@ func App() {
 		}
 	}
 
-	fmt.Printf("export PATH=\"%s\"\n", strings.Join(cleanPaths, ":"))
+	fmt.Printf("%s\n", strings.Join(cleanPaths, ":"))
 }
