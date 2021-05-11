@@ -29,6 +29,12 @@ type (
 		Tags     []string
 		Patterns []*regexp.Regexp
 		Order    []string
+		// a map of tag to pattern
+		tpmap map[string]*regexp.Regexp
+		// map of tag to ordinal position of bucket
+		indexmap map[string]int
+		// special case this (might be nil, if there's no NULL pattern)
+		nullRE *regexp.Regexp
 	}
 )
 
@@ -87,9 +93,11 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string, env []string) (config *
 	var patterns []*regexp.Regexp
 	var notFoundVarTags map[string]bool
 	envMap := shell.BuildEnvs(env)
+	var nullRE *regexp.Regexp
+
+	tpmap := make(map[string]*regexp.Regexp)
 
 	for tag, ptrn := range tree.Get("patterns").(*toml.Tree).ToMap() {
-		tags = append(tags, tag)
 		var p string // god go is fucking obnoxious
 		p = ptrn.(string)
 
@@ -100,7 +108,13 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string, env []string) (config *
 			continue
 		}
 		reg := regexp.MustCompile(newp)
-		patterns = append(patterns, reg)
+		if tag == "NULL" {
+			nullRE = reg
+		} else {
+			tags = append(tags, tag)
+			patterns = append(patterns, reg)
+			tpmap[tag] = reg
+		}
 	}
 
 	// filter out tags with not found environment variables from the ordering list
@@ -118,7 +132,11 @@ func loadConfigFromTree(tree *toml.Tree, homeStr string, env []string) (config *
 		Tags:     tags,
 		Patterns: patterns,
 		Order:    tagOrder,
+		tpmap:    tpmap,
+		nullRE:   nullRE,
 	}
+
+	config.indexmap = config.makeIndexMap()
 
 	log.Debugf("config loaded:")
 	log.Debugf("tags:     %+v", config.Tags)
@@ -175,6 +193,14 @@ func (c *Config) makeIndexMap() (imap map[string]int) {
 	return imap
 }
 
+func (c *Config) makeTagPatternMap() (tpmap map[string]*regexp.Regexp) {
+	tpmap = make(map[string]*regexp.Regexp, len(c.Tags))
+	for i := range c.Tags {
+		tpmap[c.Tags[i]] = c.Patterns[i]
+	}
+	return tpmap
+}
+
 func (c *Config) makeBuckets() (buckets [][]string) {
 	buckets = make([][]string, len(c.Order))
 	for i := range c.Order {
@@ -193,8 +219,13 @@ func isDuplicate(needle string, haystack []string) bool {
 	return false
 }
 
+func (c *Config) MatchesNull(pathEl string) bool {
+	return c.nullRE != nil && c.nullRE.MatchString(pathEl)
+}
+
 func (c *Config) Fix(pathstr string) (newPathEls []string) {
 	imap := c.makeIndexMap()
+	tpmap := c.makeTagPatternMap()
 	buckets := c.makeBuckets()
 	var other []string
 
@@ -203,18 +234,16 @@ func (c *Config) Fix(pathstr string) (newPathEls []string) {
 	var foundMatch bool
 
 	for _, el := range pathEls {
-		foundMatch = false
-		for i, re := range c.Patterns {
-			if re.MatchString(el) {
-				foundMatch = true
-				// using the index of Patterns, we know the Tag, so we use the
-				// indexMap to look up what ordered bucket it goes in, and add
-				// this path element to the correct bucket.
-				// index -> tag name -> order index
-				//
-				tag := c.Tags[i]
+		if c.MatchesNull(el) {
+			continue
+		}
 
-				// if the tag is the special NULL tag, we drop this path element
+		for _, tag := range c.Order {
+			ptrn := tpmap[tag]
+			foundMatch = false
+			if ptrn.MatchString(el) {
+				foundMatch = true
+
 				if tag == "NULL" {
 					break
 				}
@@ -226,8 +255,7 @@ func (c *Config) Fix(pathstr string) (newPathEls []string) {
 				}
 			}
 		}
-		// if we didn't match any patterns, put the path element into the
-		// "other" slice for use later
+
 		if !foundMatch {
 			other = append(other, el)
 		}
@@ -238,10 +266,13 @@ func (c *Config) Fix(pathstr string) (newPathEls []string) {
 	// a "set" more or less for stripping duplicates in the scope of the whole path
 	dedup := make(map[string]bool)
 
-	for _, bucket := range buckets {
+	for _, tag := range c.Order {
+		bucket := buckets[c.indexmap[tag]]
+		if len(bucket) > 0 {
+			log.Tracef("%#v: %#v", tag, bucket)
+		}
 		for _, el := range bucket {
 			if _, has := dedup[el]; has {
-				// this is a dup, skip it
 				continue
 			} else {
 				dedup[el] = true
@@ -251,7 +282,14 @@ func (c *Config) Fix(pathstr string) (newPathEls []string) {
 	}
 
 	if other != nil {
-		result = append(result, other...)
+		for _, el := range other {
+			if _, has := dedup[el]; has {
+				continue
+			} else {
+				dedup[el] = true
+				result = append(result, el)
+			}
+		}
 	}
 
 	return result
